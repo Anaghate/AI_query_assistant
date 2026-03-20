@@ -255,7 +255,3 @@ Recommended free hosting: **Railway**
 - Secured API credentials using environment variables; deployed via Railway
 
 ---
-
-## License
-
-MIT License — free to use for learning or as a portfolio project.
