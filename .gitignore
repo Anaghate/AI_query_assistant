@@ -1,0 +1,15 @@
+# Build files
+target/
+
+# Environment variables
+.env
+
+# IDE files
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+
+# Logs
+*.log
