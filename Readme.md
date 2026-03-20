@@ -1,13 +1,40 @@
-# AI Query Assistant
+# AI Assistant — Spring Boot + LLM Integration
 
-A Spring Boot REST API that integrates with the Anthropic Claude API to generate AI-powered responses for user queries. Built with Java 17 and Spring Boot 3.2.
+A Spring Boot REST API with two AI-powered features:
+- **Chat Assistant** — ask any question, get an instant answer powered by Claude
+- **Car Damage Analyzer** — upload a car photo, get a structured damage report with location, severity, and description
 
 ---
 
 ## Demo
 
-Type any question into the chat UI and get an instant response powered by Claude.
+![Car Damage Analyzer](docs/demo.png)
 
+> Severe damage detected on driver side doors and quarter panel — only 357 input tokens used after image resizing and OpenCV cropping.
+
+---
+
+## Features
+
+### Chat Assistant
+- Send any question to Claude and get an AI-generated answer
+- Clean chat UI with typing indicator and message history
+- Powered by `claude-sonnet-4-5` via Anthropic API
+
+### Car Damage Analyzer
+- Upload any car image (JPG, PNG, WEBP up to 10MB)
+- Image is automatically resized to 512px to reduce token usage
+- OpenCV detects the damage region and crops to it before sending to AI
+- Returns structured report: damage location, severity, description
+- Token usage displayed on every result
+
+### Token Optimization
+| Technique | Saving |
+|-----------|--------|
+| Resize image to 512px | ~80% fewer image tokens |
+| OpenCV crop to damage region | ~60% fewer tokens on top |
+| `max_tokens: 150` output cap | Short, structured responses only |
+| Focused JSON system prompt | No rambling, predictable output |
 
 ---
 
@@ -15,50 +42,57 @@ Type any question into the chat UI and get an instant response powered by Claude
 
 - **Java 17**
 - **Spring Boot 3.2**
-- **Anthropic Claude API** (`claude-3-5-sonnet`)
-- **Maven** (build tool)
-- **HTML/CSS/JS** (frontend chat UI)
+- **Anthropic Claude API** (`claude-sonnet-4-5`)
+- **OpenCV 4.7** — damage region detection
+- **imgscalr** — image resizing
+- **Maven** — build tool
+- **HTML / CSS / JS** — frontend (no framework)
 
 ---
 
 ## Project Structure
 
 ```
-ai-query-assistant/
-├── src/
-│   └── main/
-│       ├── java/com/example/aiassistant/
-│       │   ├── AiAssistantApplication.java
-│       │   ├── controller/
-│       │   │   └── ChatController.java
-│       │   ├── service/
-│       │   │   └── AnthropicService.java
-│       │   ├── model/
-│       │   │   ├── ChatRequest.java
-│       │   │   └── ChatResponse.java
-│       │   └── config/
-│       │       └── AppConfig.java
-│       └── resources/
-│           ├── application.yml
-│           └── static/
-│               └── index.html
+AI_query_assistant/
+│
+├── pom.xml
+├── .env                   ← API key (never commit)
 ├── .env.example
 ├── .gitignore
-├── pom.xml
-└── README.md
+├── README.md
+├── docs/
+│   └── demo.png           ← screenshot
+│
+└── src/main/
+    ├── java/com/example/aiassistant/
+    │   ├── AiAssistantApplication.java
+    │   ├── config/
+    │   │   └── AppConfig.java
+    │   ├── controller/
+    │   │   ├── ChatController.java          ← POST /api/ask
+    │   │   └── DamageController.java        ← POST /api/analyze
+    │   ├── service/
+    │   │   ├── AnthropicService.java        ← chat LLM calls
+    │   │   ├── AnthropicVisionService.java  ← vision LLM calls
+    │   │   └── ImageProcessingService.java  ← resize + OpenCV crop
+    │   └── model/
+    │       ├── ChatRequest.java
+    │       ├── ChatResponse.java
+    │       └── DamageResponse.java
+    └── resources/
+        ├── application.yml
+        └── static/
+            └── index.html                   ← unified UI with tab switcher
 ```
 
 ---
 
 ## Prerequisites
 
-Make sure you have the following installed:
-
 - [Java 17+](https://adoptium.net)
 - [Maven 3.8+](https://maven.apache.org/install.html)
 - An [Anthropic API key](https://console.anthropic.com)
 
-Verify your installations:
 ```bash
 java -version
 mvn -version
@@ -77,31 +111,24 @@ cd ai-query-assistant
 
 ### 2. Set up your API key
 
-Copy the example env file:
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and add your Anthropic API key:
+Open `.env` and add your key:
 ```
 ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxx
 ```
 
-> ⚠️ Never commit your `.env` file. It is already listed in `.gitignore`.
+> ⚠️ Never commit `.env` — it is already in `.gitignore`.
 
-### 3. Build the project
-
-```bash
-mvn clean package -DskipTests
-```
-
-### 4. Run the app
+### 3. Build and run
 
 ```bash
-export $(cat .env | xargs) && mvn spring-boot:run
+export $(cat .env | xargs) && mvn clean package -DskipTests && mvn spring-boot:run
 ```
 
-### 5. Open the chat UI
+### 4. Open in browser
 
 ```
 http://localhost:8080
@@ -111,21 +138,38 @@ http://localhost:8080
 
 ## API Reference
 
-### `POST /api/ask`
+### Chat — `POST /api/ask`
 
-Send a question and receive an AI-generated answer.
-
-**Request:**
 ```bash
 curl -X POST http://localhost:8080/api/ask \
   -H "Content-Type: application/json" \
   -d '{"question": "What is Spring Boot?"}'
 ```
 
-**Response:**
+Response:
 ```json
 {
-  "answer": "Spring Boot is a framework that simplifies building production-ready Java applications..."
+  "answer": "Spring Boot is a framework that simplifies building Java applications..."
+}
+```
+
+---
+
+### Car Damage — `POST /api/analyze`
+
+```bash
+curl -X POST http://localhost:8080/api/analyze \
+  -F "image=@/path/to/car.jpg"
+```
+
+Response:
+```json
+{
+  "damageLocation": "driver side doors and quarter panel",
+  "severity": "severe",
+  "description": "Extensive crushing and metal deformation along entire driver side body panels",
+  "damageDetected": true,
+  "tokensUsed": "input: 357, output: 58"
 }
 ```
 
@@ -133,19 +177,23 @@ curl -X POST http://localhost:8080/api/ask \
 
 ## Configuration
 
-All configuration lives in `src/main/resources/application.yml`:
+`src/main/resources/application.yml`:
 
 ```yaml
 server:
   port: 8080
 
+spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
 anthropic:
   api:
-    key: ${ANTHROPIC_API_KEY}   # loaded from environment variable
-  model: claude-sonnet-4-5-20250929
+    key: ${ANTHROPIC_API_KEY}
+  model: claude-sonnet-4-5
 ```
-
-To change the port, update `server.port`. To switch models, update `anthropic.model`.
 
 ---
 
@@ -155,18 +203,22 @@ To change the port, update `server.port`. To switch models, update `anthropic.mo
 |----------|-------------|----------|
 | `ANTHROPIC_API_KEY` | Your Anthropic API key | ✅ Yes |
 
-See `.env.example` for a template.
-
 ---
 
 ## How It Works
 
-1. User types a question in the browser UI
-2. The frontend sends a `POST /api/ask` request to Spring Boot
-3. `ChatController` receives the request and calls `AnthropicService`
-4. `AnthropicService` builds the JSON payload and calls the Anthropic API
-5. Claude's response is parsed and returned as a `ChatResponse`
-6. The answer is displayed in the chat UI
+### Chat flow
+1. User types a question in the Chat tab
+2. `ChatController` receives `POST /api/ask`
+3. `AnthropicService` calls the Anthropic API
+4. Answer is returned and displayed in the chat bubble
+
+### Damage analysis flow
+1. User uploads a car image in the Damage Analyzer tab
+2. `DamageController` receives `POST /api/analyze`
+3. `ImageProcessingService` resizes to 512px and uses OpenCV to detect and crop the damage region
+4. `AnthropicVisionService` sends the cropped image with a focused prompt (`max_tokens: 150`)
+5. Structured JSON response is parsed and displayed as a damage report
 
 ---
 
@@ -174,27 +226,36 @@ See `.env.example` for a template.
 
 | Problem | Fix |
 |---------|-----|
-| `401 Unauthorized` | Check your `ANTHROPIC_API_KEY` is set correctly |
-| `Port 8080 already in use` | Change `server.port` in `application.yml` to `8081` |
-| `BUILD FAILURE` | Make sure you are in the root folder (where `pom.xml` is) |
-| Response is slow on first call | Normal — JVM warms up after the first request |
+| `401 Unauthorized` | Check `ANTHROPIC_API_KEY` is set correctly |
+| `Port 8080 in use` | Change `server.port` in `application.yml` |
+| `BUILD FAILURE` | Run Maven from the root folder (where `pom.xml` is) |
+| Slow first response | Normal — JVM warms up after the first request |
+| Image upload fails | Check `max-file-size` in `application.yml` |
 
 ---
 
-## Security
+## Deployment
 
-- API keys are loaded from environment variables, never hardcoded
-- `.env` is excluded from version control via `.gitignore`
-- CORS is configured on the controller for local development
+Recommended free hosting: **Railway**
+
+1. Push code to GitHub
+2. Go to [railway.app](https://railway.app) → New Project → Deploy from GitHub
+3. Add environment variable: `ANTHROPIC_API_KEY=sk-ant-...`
+4. Railway auto-detects Spring Boot and gives you a live URL
 
 ---
 
 ## Resume Entry
 
-**AI Query Assistant — Spring Boot + LLM Integration**
-- Developed a Spring Boot REST API integrating the Anthropic Claude API to generate AI-powered responses for user queries
-- Designed backend endpoints to handle query processing, API integration, and response formatting with proper error handling
-- Implemented prompt engineering techniques to control LLM output and improve response relevance
-- Secured API credentials using environment variables to prevent key exposure in version control
+**AI Assistant — Spring Boot + LLM Integration**
+- Developed a Spring Boot REST API integrating the Anthropic Claude API for both text chat and vision-based car damage analysis
+- Built an image processing pipeline using OpenCV and imgscalr to resize, detect damage regions, and crop images before sending to the vision model — reducing token usage by ~80%
+- Implemented prompt engineering with a structured JSON system prompt and `max_tokens` cap to produce concise, predictable AI output
+- Designed a unified single-page frontend with tab switching between chat and damage analyzer modes
+- Secured API credentials using environment variables; deployed via Railway
 
 ---
+
+## License
+
+MIT License — free to use for learning or as a portfolio project.
