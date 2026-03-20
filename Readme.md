@@ -142,7 +142,7 @@ server:
 anthropic:
   api:
     key: ${ANTHROPIC_API_KEY}   # loaded from environment variable
-  model: claude-3-5-sonnet-20241022
+  model: claude-sonnet-4-5-20250929
 ```
 
 To change the port, update `server.port`. To switch models, update `anthropic.model`.
